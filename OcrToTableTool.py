@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 import subprocess
+import pytesseract
+import re
 
 class OcrToTableTool:
 
@@ -33,7 +35,7 @@ class OcrToTableTool:
                 [1,1,1,1,1,1,1,1,1,1],
                [1,1,1,1,1,1,1,1,1,1]
         ])
-        self.dilated_image = cv2.dilate(self.thresholded_image, kernel_to_remove_gaps_between_words, iterations=5)
+        self.dilated_image = cv2.dilate(self.thresholded_image, kernel_to_remove_gaps_between_words, iterations=2)
         simple_kernel = np.ones((5,5), np.uint8)
         self.dilated_image = cv2.dilate(self.dilated_image, simple_kernel, iterations=2)
     
@@ -51,7 +53,7 @@ class OcrToTableTool:
 
     def draw_contours(self):
         self.image_with_contours = self.original_image.copy()
-        cv2.drawContours(self.image_with_contours, self.approximated_contours, -1, (0, 255, 0), 5)
+        cv2.drawContours(self.image_with_contours, self.approximated_contours, -1, (0, 255, 0), 2)
 
     def convert_contours_to_bounding_boxes(self):
         self.bounding_boxes = []
@@ -108,15 +110,31 @@ class OcrToTableTool:
             current_row = []
 
     def get_result_from_tersseract(self, image_path):
-        output = subprocess.getoutput('tesseract ' + image_path + ' - -l eng --oem 3 --psm 7 --dpi 72 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789().calmg* "')
+        pytesseract.pytesseract.tesseract_cmd = fr"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        # output = subprocess.getoutput('tesseract ' + image_path + ' - -l eng --oem 3 --psm 7 --dpi 72 -c tessedit_char_whitelist="0123456789.calmg* "')
+        config = '--psm 6 --oem 3 -c tessedit_char_whitelist="0123456789."'
+        output = pytesseract.image_to_string(image_path, config=config, lang='eng')
         output = output.strip()
         return output
 
     def generate_csv_file(self):
-        with open("output.csv", "w") as f:
+        def clean_decimal_points(num):
+            num = num.rstrip('.')
+            num = re.sub(r'\.(?=.*\.)', '', num)
+            parts = num.split('.')
+            if len(parts) > 1:
+                return parts[0] + '.' + parts[1][:2]
+            else:
+                return num
+            
+        with open("output.csv", "a") as f:
             for row in self.table:
-                f.write(",".join(row) + "\n")
+                joined_row = ",".join([clean_decimal_points(cell) for cell in row if cell != ''])
+                print(joined_row)
+                f.write(joined_row + "\n")
 
     def store_process_image(self, file_name, image):
         path = "./process_images/ocr_table_tool/" + file_name
         cv2.imwrite(path, image)
+
+    

@@ -11,6 +11,8 @@ class TableExtractor:
         self.store_process_image("0_original.jpg", self.image)
         self.convert_image_to_grayscale()
         self.store_process_image("1_grayscaled.jpg", self.grayscale_image)
+        self.blur_image()
+        self.store_process_image("2_blurred.jpg", self.blurred_image)
         self.threshold_image()
         self.store_process_image("3_thresholded.jpg", self.thresholded_image)
         self.invert_image()
@@ -42,13 +44,17 @@ class TableExtractor:
         self.blurred_image = cv2.blur(self.grayscale_image, (5, 5))
 
     def threshold_image(self):
-        self.thresholded_image = cv2.threshold(self.grayscale_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+        # self.thresholded_image = cv2.threshold(self.grayscale_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+        self.thresholded_image = cv2.threshold(self.blurred_image, 250, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
     def invert_image(self):
         self.inverted_image = cv2.bitwise_not(self.thresholded_image)
 
     def dilate_image(self):
-        self.dilated_image = cv2.dilate(self.inverted_image, None, iterations=5)
+        # self.dilated_image = cv2.dilate(self.inverted_image, None, iterations=5)
+        kernel = np.ones((5, 5), np.uint8)
+        eroded_image = cv2.erode(self.inverted_image, kernel, iterations=1)
+        self.dilated_image = cv2.morphologyEx(self.inverted_image, cv2.MORPH_CLOSE, kernel)
 
     def find_contours(self):
         self.contours, self.hierarchy = cv2.findContours(self.dilated_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
